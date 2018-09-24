@@ -4,6 +4,7 @@ import com.direwolf20.buildinggadgets.BuildingGadgets;
 import com.direwolf20.buildinggadgets.Config;
 import com.direwolf20.buildinggadgets.ModBlocks;
 import com.direwolf20.buildinggadgets.ModItems;
+import com.direwolf20.buildinggadgets.api.schematic.ISchematic;
 import com.direwolf20.buildinggadgets.entities.BlockBuildEntity;
 import com.direwolf20.buildinggadgets.tools.BuildingModes;
 import com.direwolf20.buildinggadgets.tools.InventoryManipulation;
@@ -213,6 +214,22 @@ public class BuildingTool extends GenericGadget {
             if (undoCoords.size() > 0) { //If the undo list has any data in it, add it to NBT on the tool.
                 UndoState undoState = new UndoState(player.dimension, undoCoords);
                 pushUndoList(heldItem, undoState);
+            }
+        }
+        else {
+            ISchematic schematic = getSchematic(heldItem);
+            if (!schematic.isEmpty()){
+                NonNullList<ItemStack> requiredItems = schematic.computeRequiredItems();
+                int buildingSets = InventoryManipulation.removeSets(InventoryManipulation.getCombinedContainers(player), 1, coords.size(), requiredItems, false);
+                if (buildingSets == 0){
+                    return false;
+                }
+                if (coords.size() > buildingSets){
+                    coords.subList(buildingSets, coords.size()).clear();
+                }
+                for (BlockPos coordinate : coords){
+                    schematic.build(world, coordinate);
+                }
             }
         }
         BuildingModes.sortByDistance(coords, player);

@@ -1,8 +1,12 @@
 package com.direwolf20.buildinggadgets.tools;
 
+import com.direwolf20.buildinggadgets.api.schematic.EmptySchematic;
+import com.direwolf20.buildinggadgets.api.schematic.ISchematic;
+import com.direwolf20.buildinggadgets.api.schematic.SchematicFactory;
 import com.direwolf20.buildinggadgets.blocks.ConstructionBlockTileEntity;
 import com.direwolf20.buildinggadgets.items.BuildingTool;
 import com.direwolf20.buildinggadgets.items.ExchangerTool;
+import net.minecraft.block.Block;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.init.Blocks;
@@ -13,6 +17,7 @@ import net.minecraft.nbt.NBTTagList;
 import net.minecraft.nbt.NBTUtil;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.EnumFacing;
+import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.RayTraceResult;
 import net.minecraft.util.text.TextComponentString;
@@ -22,6 +27,7 @@ import net.minecraft.world.World;
 import net.minecraftforge.energy.CapabilityEnergy;
 import net.minecraftforge.energy.IEnergyStorage;
 
+import javax.annotation.Nonnull;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -187,6 +193,27 @@ public class GadgetUtils {
         stack.setTagCompound(tagCompound);
     }
 
+    public static void setSchematic(ItemStack stack, @Nonnull ISchematic schematic, Block block){
+        NBTTagCompound tagCompound = stack.getTagCompound();
+        if (tagCompound == null) {
+            tagCompound = new NBTTagCompound();
+        }
+        NBTTagCompound schematicTag = new NBTTagCompound();
+        schematicTag.setString("buildinggadgets:key", block.getRegistryName().toString());
+        tagCompound.setTag("schematic", schematic.serializeNBT(schematicTag));
+        stack.setTagCompound(tagCompound);
+    }
+
+    public static ISchematic getSchematic(ItemStack stack){
+        NBTTagCompound tagCompound = stack.getTagCompound();
+        if (tagCompound != null){
+            NBTTagCompound schematicTag = tagCompound.getCompoundTag("schematic");
+            SchematicFactory schematicFactory = SchematicFactory.FACTORYS.getValue(new ResourceLocation(schematicTag.getString("buildinggadgets:key")));
+            if (schematicFactory != null)
+                return schematicFactory.get().deserializeNBT(schematicTag);
+        }
+        return EmptySchematic.EMPTY;
+    }
 
     public static IBlockState getToolBlock(ItemStack stack) {
         NBTTagCompound tagCompound = stack.getTagCompound();
@@ -232,6 +259,18 @@ public class GadgetUtils {
                     validBlock = false;
                 }
             } else {
+                ISchematic schematic = SchematicFactory.getSchematic(state);
+                if (!schematic.isEmpty()){
+                    schematic.init(world, pos, state ,te);
+                    setSchematic(stack, schematic, state.getBlock());
+                    NBTTagCompound tagCompound = stack.getTagCompound();
+                    if (tagCompound != null){
+                        tagCompound.removeTag("actualblockstate");
+                        tagCompound.removeTag("blockstate");
+                    }
+
+                    return;
+                }
                 validBlock = false;
             }
         }

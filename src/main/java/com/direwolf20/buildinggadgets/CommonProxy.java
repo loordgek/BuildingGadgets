@@ -1,6 +1,7 @@
 package com.direwolf20.buildinggadgets;
 
 
+import com.direwolf20.buildinggadgets.api.schematic.SchematicFactory;
 import com.direwolf20.buildinggadgets.blocks.ConstructionBlock;
 import com.direwolf20.buildinggadgets.blocks.ConstructionBlockPowder;
 import com.direwolf20.buildinggadgets.blocks.ConstructionBlockTileEntity;
@@ -10,7 +11,9 @@ import com.direwolf20.buildinggadgets.blocks.templatemanager.TemplateManagerTile
 import com.direwolf20.buildinggadgets.gui.GuiProxy;
 import com.direwolf20.buildinggadgets.items.*;
 import com.direwolf20.buildinggadgets.network.PacketHandler;
+import com.direwolf20.buildinggadgets.schematic.SchematicFlowerPot;
 import net.minecraft.block.Block;
+import net.minecraft.init.Blocks;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemBlock;
 import net.minecraftforge.common.config.Configuration;
@@ -73,5 +76,10 @@ public class CommonProxy {
             event.getRegistry().register(new ConstructionPaste());
             event.getRegistry().register(new ConstructionPasteContainer());
         }
+    }
+
+    @SubscribeEvent
+    public static void registerSchematics(RegistryEvent.Register<SchematicFactory> event) {
+        event.getRegistry().register(new SchematicFactory(SchematicFlowerPot::new).setRegistryName(Blocks.FLOWER_POT.getRegistryName()));
     }
 }

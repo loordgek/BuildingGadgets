@@ -14,12 +14,16 @@ import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.EnumHand;
+import net.minecraft.util.NonNullList;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 import net.minecraftforge.items.CapabilityItemHandler;
 import net.minecraftforge.items.IItemHandler;
+import net.minecraftforge.items.ItemHandlerHelper;
 
+import javax.annotation.Nonnull;
 import java.util.*;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -60,6 +64,91 @@ public class InventoryManipulation {
         ItemStack giveItemStack = itemStack.copy();
         boolean success = inv.addItemStackToInventory(giveItemStack);
         return success;
+    }
+
+    public static NonNullList<ItemStack> getStacksCondensed(IItemHandler itemHandler) {
+        NonNullList<ItemStack> itemStacks = CondensedItemStackList.create();
+        int bound = itemHandler.getSlots();
+        for (int i = 0; i < bound; i++) {
+            ItemStack stack = itemHandler.getStackInSlot(i);
+            if (!stack.isEmpty()) {
+                itemStacks.add(stack.copy());
+            }
+        }
+        return itemStacks;
+    }
+
+    public static int containsSets(NonNullList<ItemStack> set, NonNullList<ItemStack> stock) {
+        int totalSets = 0;
+
+        for (ItemStack req : set) {
+
+            int reqCount = 0;
+            for (ItemStack offer : stock) {
+                if (ItemHandlerHelper.canItemStacksStackRelaxed(req, offer)) {
+                    int stackCount = offer.getCount() / req.getCount();
+                    reqCount = Math.max(reqCount, stackCount);
+                }
+            }
+
+            if (reqCount == 0) {
+                return 0;
+            } else if (totalSets == 0) {
+                totalSets = reqCount;
+            } else if (totalSets > reqCount) {
+                totalSets = reqCount;
+            }
+        }
+
+        return totalSets;
+    }
+
+    public static IItemHandler getCombinedContainers(EntityPlayer player){
+        List<IItemHandler> handlers = findInvContainers(player.inventory);
+        handlers.add(player.getCapability(CapabilityItemHandler.ITEM_HANDLER_CAPABILITY, EnumFacing.DOWN));
+        return new CombinedInvWrapper(handlers.toArray(new IItemHandler[handlers.size()]));
+    }
+
+    public static int removeSets(IItemHandler handler, int min, int max, NonNullList<ItemStack> set, boolean simulate) {
+        NonNullList<ItemStack> stock = getStacksCondensed(handler);
+        if (!simulate) {
+            NonNullList<ItemStack> removed = removeSets(handler, stock, min, max, set);
+            return !removed.isEmpty() ? removed.get(0).getCount() / set.get(0).getCount() : 0;
+        } else {
+            return containsSets(set, stock);
+        }
+    }
+
+    @Nonnull
+    public static NonNullList<ItemStack> removeSets(IItemHandler handler, NonNullList<ItemStack> stock, int min, int max, NonNullList<ItemStack> set) {
+        NonNullList<ItemStack> removed = CondensedItemStackList.create();
+        int containedSets = containsSets(set, stock);
+        if (containedSets < min) {
+            return removed;
+        }
+        for (ItemStack stack : set) {
+            if (stack.isEmpty()) {
+                continue;
+            }
+            ItemStack removedStack = removeStack(handler, itemStack -> ItemHandlerHelper.canItemStacksStack(stack, itemStack), stack.getCount() * Math.min(containedSets, max));
+            removed.add(removedStack);
+        }
+        return removed;
+    }
+
+    @Nonnull
+    private static ItemStack removeStack(IItemHandler handler, Predicate<ItemStack> filter, int amount) {
+        for (int i = 0; i < handler.getSlots(); i++) {
+            ItemStack stackInSlot = handler.getStackInSlot(i);
+            if (!stackInSlot.isEmpty() && filter.test(stackInSlot)){
+                ItemStack removed = handler.extractItem(i, amount, false);
+                amount -= removed.getCount();
+                if (amount == 0) {
+                    return removed;
+                }
+            }
+        }
+        return ItemStack.EMPTY;
     }
 
     public static boolean useItem(ItemStack itemStack, EntityPlayer player, int count) {
